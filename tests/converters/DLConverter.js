@@ -8,5 +8,5 @@ test('symboles basic', function() {
 	
 	var dl = new DLConverter();
 	equal(dl.convert('()+\'/?:'), '^&¤~$//(_');
-	equal(dl.convert('!-'), '`)');
+	equal(dl.convert('!-=]['), '`)}‡');
 })
