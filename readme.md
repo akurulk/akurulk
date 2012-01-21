@@ -19,7 +19,7 @@ And language based solutions should be able to use by anyone for any purpose
 Licence
 -------
 
-This will be 100% Open Sourced under MIT Licence.
+This is 100% Open Sourced under MIT Licence.
 Which means you can use this for any of your projects/products whether they are Open Source or not.
 
 Copyright (C) 2012 Arunoda Susiripala 
