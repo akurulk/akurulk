@@ -14,23 +14,40 @@
 			font-size: 30px;
 		}
 
-		em {
-			font-family: 'arial';
-			font-style: normal;
+		#native {
+			font-family: 'tahoma';
 		}
+
 	</style>
 
 </head>
-<body>
+<body >
 
-	<div id='title' class='arjun'>
+	<div id='title' >
 		<a href='http://kodeincloud.com'>අරුනෝද සුසිරිපාල</a><br>
 	</div>
 
-	<div id='body' class='derana'>
+	<div id='body' >
 		ලංකාවේ මාර්ග අතරින් හම්බ උන හොඳම මාර්ගයක්... තව ඒකේ යාපනයේ සිට කිලෝමීටර් 8ක් පමණ වැඩ ඉවර නැති උනත් හදලා ඉවර හරියනම් හොඳටම තියෙනවා... මගේ බයිසිමොටෝවේ උපරිම වේගය ලබා ගන්න ඒ හරියෙදි පුළුවන්කම ලැබුනා කිව්වම..ඔව් ඉතිං මේකේ මොන වේගද..? යන්තං <b>90</b> පන්න ගත්තා එයිට එහා යන්ට ඇහැකි එහෙකනං විදිල්ල වගේ යන්ට පුළුවන් පාර.. ඉතිං කොහොම හරි අර කොට කොට ආව පාරෙන් මේකට ආවට පස්සේ නිකං කෙලින්ම අපායේ ඉඳින් දිවිය ලෝකෙට උසස්වීමක් ලැබුනා වගේ උනා...
 
 ඇත්තටම ඒ පාර දෙපැත්තත් බොහෝම ලස්සනයි.. ඒක ඉතිං ගිහින්ම දැක්ය යුතු දෙයක් තමා..ඒ විතරක් නෙවෙයි බොහෝම සරුසාරෙට පැසෙන කුඹුරු...
+	</div>
+
+	<div id='native'>
+
+		<h1>Akuru Lk</h1>
+		Lassana Sinhala Akuru for the Web
+
+		AkuruLk is an attempt to provide beautiful Sihala fonts for the Web. It will work on the all the modern browsers including
+
+		Chrome
+		Firefox
+		Safari
+		Android
+		iOs
+		Motivation
+
+		Language is should be the heart of the expression. And it needs to beautiful. But sinhala is not beautiful in the Web. And language based solutions should be able to use by anyone for any purpose
 	</div>
 
 	<script type="text/javascript" src="../lib/unicodeSinhala.js"></script>
@@ -40,8 +57,8 @@
 	<script type="text/javascript" src="../lib/htmlparser.js"></script>
 	<script type="text/javascript" src="../lib/akuru.js"></script>
 	<script type='text/javascript'>
-		akuru.load('arjun');
-		akuru.load('derana');
+		akuru.global('arjun');
+		//akuru.load('derana');
 	</script>
 
 </body>
