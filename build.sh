@@ -14,7 +14,7 @@ echo "Minifying Started"
 uglifyjs lib/prefix.js >> dist/akuru.min.js
 uglifyjs lib/unicodeSinhala.js >> dist/akuru.min.js
 uglifyjs lib/tokenizer.js >> dist/akuru.min.js
-uglifyjs lib/converters/DLConverter.js >> dist/akuru.min.js
+uglifyjs lib/converters/legacyConverter.js >> dist/akuru.min.js
 uglifyjs lib/vendors/htmlparser.js >> dist/akuru.min.js
 uglifyjs lib/akuru.js >> dist/akuru.min.js
 uglifyjs lib/loader.js >> dist/akuru.min.js
