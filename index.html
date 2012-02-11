@@ -14,6 +14,11 @@
 			font-size: 30px;
 		}
 
+		#other {
+			font-size: 50px;
+			font-family: 'paras';
+		}
+
 	</style>
 
 	<script type="text/javascript" src="./lib/prefix.js"></script>
@@ -25,20 +30,40 @@
 	<script type="text/javascript" src="./lib/loader.js"></script>
 	<script type='text/javascript'>
 		akuru.load('derana');
-		akuru.load('manel');
+		akuru.load('paras');
+		akuru.load('arjun');
+
+		akuru.ready(function() {
+			akuru.enable('#body', 'derana');
+		});
+	</script>
+
+	<script type='text/javascript'>
+		
+		function addText() {
+
+			// $('#other').addClass('manel');
+			$('#other').append($('#body').html());
+		}
 	</script>
 </head>
-<body class='manel'>
+<body>
 
-	<div id='title' >
+	<div id='title' class='arjun'>
 		<a href='http://kodeincloud.com'>අරුනෝද සුසිරිපාල</a><br>
 	</div>
 
 	<div id='body'>
-
-		ඟ
-        ජ
+		ඕං බලන්නකො හිතුනු ඒවා එදා රෑ................. <br>
 	</div>
+
+
+	<div id='other'>
+		
+	</div>
+
+	<button onclick='addText();'>Add Text</button>
+        	
 
 
 </body>
