@@ -1,311 +1,475 @@
-/*
- * HTML Parser By John Resig (ejohn.org)
- * Original code by Erik Arvidsson, Mozilla Public License
- * http://erik.eae.net/simplehtmlparser/simplehtmlparser.js
- *
- * // Use like so:
- * HTMLParser(htmlString, {
- *     start: function(tag, attrs, unary) {},
- *     end: function(tag) {},
- *     chars: function(text) {},
- *     comment: function(text) {}
- * });
- *
- * // or to get an XML string:
- * HTMLtoXML(htmlString);
- *
- * // or to get an XML DOM Document
- * HTMLtoDOM(htmlString);
- *
- * // or to inject into an existing document/DOM node
- * HTMLtoDOM(htmlString, document);
- * HTMLtoDOM(htmlString, document.body);
- *
- */
+/***********************************************
+Copyright 2010, 2011, Chris Winberry <chris@winberry.net>. All rights reserved.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to
+deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-(function(){
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
-	// Regular Expressions for parsing tags and attributes
-	var startTag = /^<([-A-Za-z0-9_]+)((?:\s+\w+(?:\s*=\s*(?:(?:"[^"]*")|(?:'[^']*')|[^>\s]+))?)*)\s*(\/?)>/,
-		endTag = /^<\/([-A-Za-z0-9_]+)[^>]*>/,
-		attr = /([-A-Za-z0-9_]+)(?:\s*=\s*(?:(?:"((?:\\.|[^"])*)")|(?:'((?:\\.|[^'])*)')|([^>\s]+)))?/g;
-		
-	// Empty Elements - HTML 4.01
-	var empty = makeMap("area,base,basefont,br,col,frame,hr,img,input,isindex,link,meta,param,embed");
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
+***********************************************/
+/* v1.7.4 */
 
-	// Block Elements - HTML 4.01
-	var block = makeMap("address,applet,blockquote,button,center,dd,del,dir,div,dl,dt,fieldset,form,frameset,hr,iframe,ins,isindex,li,map,menu,noframes,noscript,object,ol,p,pre,script,table,tbody,td,tfoot,th,thead,tr,ul");
+(function () {
 
-	// Inline Elements - HTML 4.01
-	var inline = makeMap("a,abbr,acronym,applet,b,basefont,bdo,big,br,button,cite,code,del,dfn,em,font,i,iframe,img,input,ins,kbd,label,map,object,q,s,samp,script,select,small,span,strike,strong,sub,sup,textarea,tt,u,var");
+function runningInNode () {
+	return(
+		(typeof require) == "function"
+		&&
+		(typeof exports) == "object"
+		&&
+		(typeof module) == "object"
+		&&
+		(typeof __filename) == "string"
+		&&
+		(typeof __dirname) == "string"
+		);
+}
 
-	// Elements that you can, intentionally, leave open
-	// (and which close themselves)
-	var closeSelf = makeMap("colgroup,dd,dt,li,options,p,td,tfoot,th,thead,tr");
+if (!runningInNode()) {
+	if (!this.Tautologistics)
+		this.Tautologistics = {};
+	else if (this.Tautologistics.NodeHtmlParser)
+		return; //NodeHtmlParser already defined!
+	this.Tautologistics.NodeHtmlParser = {};
+	exports = this.Tautologistics.NodeHtmlParser;
+}
 
-	// Attributes that have their values filled in disabled="disabled"
-	var fillAttrs = makeMap("checked,compact,declare,defer,disabled,ismap,multiple,nohref,noresize,noshade,nowrap,readonly,selected");
+//Types of elements found in the DOM
+var ElementType = {
+	  Text: "text" //Plain text
+	, Directive: "directive" //Special tag <!...>
+	, Comment: "comment" //Special tag <!--...-->
+	, Script: "script" //Special tag <script>...</script>
+	, Style: "style" //Special tag <style>...</style>
+	, Tag: "tag" //Any tag that isn't special
+}
 
-	// Special Elements (can contain anything)
-	var special = makeMap("script,style");
-
-	var HTMLParser = this.HTMLParser = function( html, handler ) {
-		var index, chars, match, stack = [], last = html;
-		stack.last = function(){
-			return this[ this.length - 1 ];
-		};
-
-		while ( html ) {
-			chars = true;
-
-			// Make sure we're not in a script or style element
-			if ( !stack.last() || !special[ stack.last() ] ) {
-
-				// Comment
-				if ( html.indexOf("<!--") == 0 ) {
-					index = html.indexOf("-->");
-	
-					if ( index >= 0 ) {
-						if ( handler.comment )
-							handler.comment( html.substring( 4, index ) );
-						html = html.substring( index + 3 );
-						chars = false;
-					}
-	
-				// end tag
-				} else if ( html.indexOf("</") == 0 ) {
-					match = html.match( endTag );
-	
-					if ( match ) {
-						html = html.substring( match[0].length );
-						match[0].replace( endTag, parseEndTag );
-						chars = false;
-					}
-	
-				// start tag
-				} else if ( html.indexOf("<") == 0 ) {
-					match = html.match( startTag );
-	
-					if ( match ) {
-						html = html.substring( match[0].length );
-						match[0].replace( startTag, parseStartTag );
-						chars = false;
-					}
-				}
-
-				if ( chars ) {
-					index = html.indexOf("<");
-					
-					var text = index < 0 ? html : html.substring( 0, index );
-					html = index < 0 ? "" : html.substring( index );
-					
-					if ( handler.chars )
-						handler.chars( text );
-				}
-
-			} else {
-				html = html.replace(new RegExp("(.*)<\/" + stack.last() + "[^>]*>"), function(all, text){
-					text = text.replace(/<!--(.*?)-->/g, "$1")
-						.replace(/<!\[CDATA\[(.*?)]]>/g, "$1");
-
-					if ( handler.chars )
-						handler.chars( text );
-
-					return "";
-				});
-
-				parseEndTag( "", stack.last() );
-			}
-
-			if ( html == last )
-				throw "Parse Error: " + html;
-			last = html;
-		}
-		
-		// Clean up any remaining tags
-		parseEndTag();
-
-		function parseStartTag( tag, tagName, rest, unary ) {
-			tagName = tagName.toLowerCase();
-
-			if ( block[ tagName ] ) {
-				while ( stack.last() && inline[ stack.last() ] ) {
-					parseEndTag( "", stack.last() );
-				}
-			}
-
-			if ( closeSelf[ tagName ] && stack.last() == tagName ) {
-				parseEndTag( "", tagName );
-			}
-
-			unary = empty[ tagName ] || !!unary;
-
-			if ( !unary )
-				stack.push( tagName );
-			
-			if ( handler.start ) {
-				var attrs = [];
-	
-				rest.replace(attr, function(match, name) {
-					var value = arguments[2] ? arguments[2] :
-						arguments[3] ? arguments[3] :
-						arguments[4] ? arguments[4] :
-						fillAttrs[name] ? name : "";
-					
-					attrs.push({
-						name: name,
-						value: value,
-						escaped: value.replace(/(^|[^\\])"/g, '$1\\\"') //"
-					});
-				});
-	
-				if ( handler.start )
-					handler.start( tagName, attrs, unary );
-			}
-		}
-
-		function parseEndTag( tag, tagName ) {
-			// If no tag name is provided, clean shop
-			if ( !tagName )
-				var pos = 0;
-				
-			// Find the closest opened tag of the same type
-			else
-				for ( var pos = stack.length - 1; pos >= 0; pos-- )
-					if ( stack[ pos ] == tagName )
-						break;
-			
-			if ( pos >= 0 ) {
-				// Close all the open elements, up the stack
-				for ( var i = stack.length - 1; i >= pos; i-- )
-					if ( handler.end )
-						handler.end( stack[ i ] );
-				
-				// Remove the open elements from the stack
-				stack.length = pos;
-			}
-		}
-	};
-	
-	this.HTMLtoXML = function( html ) {
-		var results = "";
-		
-		HTMLParser(html, {
-			start: function( tag, attrs, unary ) {
-				results += "<" + tag;
-		
-				for ( var i = 0; i < attrs.length; i++ )
-					results += " " + attrs[i].name + '="' + attrs[i].escaped + '"';
-		
-				results += (unary ? "/" : "") + ">";
-			},
-			end: function( tag ) {
-				results += "</" + tag + ">";
-			},
-			chars: function( text ) {
-				results += text;
-			},
-			comment: function( text ) {
-				results += "<!--" + text + "-->";
-			}
-		});
-		
-		return results;
-	};
-	
-	this.HTMLtoDOM = function( html, doc ) {
-		// There can be only one of these elements
-		var one = makeMap("html,head,body,title");
-		
-		// Enforce a structure for the document
-		var structure = {
-			link: "head",
-			base: "head"
-		};
-	
-		if ( !doc ) {
-			if ( typeof DOMDocument != "undefined" )
-				doc = new DOMDocument();
-			else if ( typeof document != "undefined" && document.implementation && document.implementation.createDocument )
-				doc = document.implementation.createDocument("", "", null);
-			else if ( typeof ActiveX != "undefined" )
-				doc = new ActiveXObject("Msxml.DOMDocument");
-			
-		} else
-			doc = doc.ownerDocument ||
-				doc.getOwnerDocument && doc.getOwnerDocument() ||
-				doc;
-		
-		var elems = [],
-			documentElement = doc.documentElement ||
-				doc.getDocumentElement && doc.getDocumentElement();
-				
-		// If we're dealing with an empty document then we
-		// need to pre-populate it with the HTML document structure
-		if ( !documentElement && doc.createElement ) (function(){
-			var html = doc.createElement("html");
-			var head = doc.createElement("head");
-			head.appendChild( doc.createElement("title") );
-			html.appendChild( head );
-			html.appendChild( doc.createElement("body") );
-			doc.appendChild( html );
-		})();
-		
-		// Find all the unique elements
-		if ( doc.getElementsByTagName )
-			for ( var i in one )
-				one[ i ] = doc.getElementsByTagName( i )[0];
-		
-		// If we're working with a document, inject contents into
-		// the body element
-		var curParentNode = one.body;
-		
-		HTMLParser( html, {
-			start: function( tagName, attrs, unary ) {
-				// If it's a pre-built element, then we can ignore
-				// its construction
-				if ( one[ tagName ] ) {
-					curParentNode = one[ tagName ];
-					return;
-				}
-			
-				var elem = doc.createElement( tagName );
-				
-				for ( var attr in attrs )
-					elem.setAttribute( attrs[ attr ].name, attrs[ attr ].value );
-				
-				if ( structure[ tagName ] && typeof one[ structure[ tagName ] ] != "boolean" )
-					one[ structure[ tagName ] ].appendChild( elem );
-				
-				else if ( curParentNode && curParentNode.appendChild )
-					curParentNode.appendChild( elem );
-					
-				if ( !unary ) {
-					elems.push( elem );
-					curParentNode = elem;
-				}
-			},
-			end: function( tag ) {
-				elems.length -= 1;
-				
-				// Init the new parentNode
-				curParentNode = elems[ elems.length - 1 ];
-			},
-			chars: function( text ) {
-				curParentNode.appendChild( doc.createTextNode( text ) );
-			},
-			comment: function( text ) {
-				// create comment node
-			}
-		});
-		
-		return doc;
-	};
-
-	function makeMap(str){
-		var obj = {}, items = str.split(",");
-		for ( var i = 0; i < items.length; i++ )
-			obj[ items[i] ] = true;
-		return obj;
+function Parser (handler, options) {
+	this._options = options ? options : { };
+	if (this._options.includeLocation == undefined) {
+		this._options.includeLocation = false; //Do not track element position in document by default
 	}
+
+	this.validateHandler(handler);
+	this._handler = handler;
+	this.reset();
+}
+
+	//**"Static"**//
+	//Regular expressions used for cleaning up and parsing (stateless)
+	Parser._reTrim = /(^\s+|\s+$)/g; //Trim leading/trailing whitespace
+	Parser._reTrimComment = /(^\!--|--$)/g; //Remove comment tag markup from comment contents
+	Parser._reWhitespace = /\s/g; //Used to find any whitespace to split on
+	Parser._reTagName = /^\s*(\/?)\s*([^\s\/]+)/; //Used to find the tag name for an element
+
+	//Regular expressions used for parsing (stateful)
+	Parser._reAttrib = //Find attributes in a tag
+		/([^=<>\"\'\s]+)\s*=\s*"([^"]*)"|([^=<>\"\'\s]+)\s*=\s*'([^']*)'|([^=<>\"\'\s]+)\s*=\s*([^'"\s]+)|([^=<>\"\'\s\/]+)/g;
+	Parser._reTags = /[\<\>]/g; //Find tag markers
+
+	//**Public**//
+	//Methods//
+	//Parses a complete HTML and pushes it to the handler
+	Parser.prototype.parseComplete = function Parser$parseComplete (data) {
+		this.reset();
+		this.parseChunk(data);
+		this.done();
+	}
+
+	//Parses a piece of an HTML document
+	Parser.prototype.parseChunk = function Parser$parseChunk (data) {
+		if (this._done)
+			this.handleError(new Error("Attempted to parse chunk after parsing already done"));
+		this._buffer += data; //FIXME: this can be a bottleneck
+		this.parseTags();
+	}
+
+	//Tells the parser that the HTML being parsed is complete
+	Parser.prototype.done = function Parser$done () {
+		if (this._done)
+			return;
+		this._done = true;
+	
+		//Push any unparsed text into a final element in the element list
+		if (this._buffer.length) {
+			var rawData = this._buffer;
+			this._buffer = "";
+			var element = {
+				  raw: rawData
+				, data: (this._parseState == ElementType.Text) ? rawData : rawData.replace(Parser._reTrim, "")
+				, type: this._parseState
+				};
+			if (this._parseState == ElementType.Tag || this._parseState == ElementType.Script || this._parseState == ElementType.Style)
+				element.name = this.parseTagName(element.data);
+			this.parseAttribs(element);
+			this._elements.push(element);
+		}
+	
+		this.writeHandler();
+		this._handler.done();
+	}
+
+	//Resets the parser to a blank state, ready to parse a new HTML document
+	Parser.prototype.reset = function Parser$reset () {
+		this._buffer = "";
+		this._done = false;
+		this._elements = [];
+		this._elementsCurrent = 0;
+		this._current = 0;
+		this._next = 0;
+		this._location = {
+			  row: 0
+			, col: 0
+			, charOffset: 0
+			, inBuffer: 0
+		};
+		this._parseState = ElementType.Text;
+		this._prevTagSep = '';
+		this._tagStack = [];
+		this._handler.reset();
+	}
+	
+	//**Private**//
+	//Properties//
+	Parser.prototype._options = null; //Parser options for how to behave
+	Parser.prototype._handler = null; //Handler for parsed elements
+	Parser.prototype._buffer = null; //Buffer of unparsed data
+	Parser.prototype._done = false; //Flag indicating whether parsing is done
+	Parser.prototype._elements =  null; //Array of parsed elements
+	Parser.prototype._elementsCurrent = 0; //Pointer to last element in _elements that has been processed
+	Parser.prototype._current = 0; //Position in data that has already been parsed
+	Parser.prototype._next = 0; //Position in data of the next tag marker (<>)
+	Parser.prototype._location = null; //Position tracking for elements in a stream
+	Parser.prototype._parseState = ElementType.Text; //Current type of element being parsed
+	Parser.prototype._prevTagSep = ''; //Previous tag marker found
+	//Stack of element types previously encountered; keeps track of when
+	//parsing occurs inside a script/comment/style tag
+	Parser.prototype._tagStack = null;
+
+	//Methods//
+	//Takes an array of elements and parses any found attributes
+	Parser.prototype.parseTagAttribs = function Parser$parseTagAttribs (elements) {
+		var idxEnd = elements.length;
+		var idx = 0;
+	
+		while (idx < idxEnd) {
+			var element = elements[idx++];
+			if (element.type == ElementType.Tag || element.type == ElementType.Script || element.type == ElementType.style)
+				this.parseAttribs(element);
+		}
+	
+		return(elements);
+	}
+
+	//Takes an element and adds an "attribs" property for any element attributes found 
+	Parser.prototype.parseAttribs = function Parser$parseAttribs (element) {
+		//Only parse attributes for tags
+		if (element.type != ElementType.Script && element.type != ElementType.Style && element.type != ElementType.Tag)
+			return;
+	
+		var tagName = element.data.split(Parser._reWhitespace, 1)[0];
+		var attribRaw = element.data.substring(tagName.length);
+		if (attribRaw.length < 1)
+			return;
+	
+		var match;
+		Parser._reAttrib.lastIndex = 0;
+		while (match = Parser._reAttrib.exec(attribRaw)) {
+			if (element.attribs == undefined)
+				element.attribs = {};
+	
+			if (typeof match[1] == "string" && match[1].length) {
+				element.attribs[match[1]] = match[2];
+			} else if (typeof match[3] == "string" && match[3].length) {
+				element.attribs[match[3].toString()] = match[4].toString();
+			} else if (typeof match[5] == "string" && match[5].length) {
+				element.attribs[match[5]] = match[6];
+			} else if (typeof match[7] == "string" && match[7].length) {
+				element.attribs[match[7]] = match[7];
+			}
+		}
+	}
+
+	//Extracts the base tag name from the data value of an element
+	Parser.prototype.parseTagName = function Parser$parseTagName (data) {
+		if (data == null || data == "")
+			return("");
+		var match = Parser._reTagName.exec(data);
+		if (!match)
+			return("");
+		return((match[1] ? "/" : "") + match[2]);
+	}
+
+	//Parses through HTML text and returns an array of found elements
+	//I admit, this function is rather large but splitting up had an noticeable impact on speed
+	Parser.prototype.parseTags = function Parser$parseTags () {
+		var bufferEnd = this._buffer.length - 1;
+		while (Parser._reTags.test(this._buffer)) {
+			this._next = Parser._reTags.lastIndex - 1;
+			var tagSep = this._buffer.charAt(this._next); //The currently found tag marker
+			var rawData = this._buffer.substring(this._current, this._next); //The next chunk of data to parse
+	
+			//A new element to eventually be appended to the element list
+			var element = {
+				  raw: rawData
+				, data: (this._parseState == ElementType.Text) ? rawData : rawData.replace(Parser._reTrim, "")
+				, type: this._parseState
+			};
+	
+			var elementName = this.parseTagName(element.data);
+	
+			//This section inspects the current tag stack and modifies the current
+			//element if we're actually parsing a special area (script/comment/style tag)
+			if (this._tagStack.length) { //We're parsing inside a script/comment/style tag
+				if (this._tagStack[this._tagStack.length - 1] == ElementType.Script) { //We're currently in a script tag
+					if (elementName == "/script") //Actually, we're no longer in a script tag, so pop it off the stack
+						this._tagStack.pop();
+					else { //Not a closing script tag
+						if (element.raw.indexOf("!--") != 0) { //Make sure we're not in a comment
+							//All data from here to script close is now a text element
+							element.type = ElementType.Text;
+							//If the previous element is text, append the current text to it
+							if (this._elements.length && this._elements[this._elements.length - 1].type == ElementType.Text) {
+								var prevElement = this._elements[this._elements.length - 1];
+								prevElement.raw = prevElement.data = prevElement.raw + this._prevTagSep + element.raw;
+								element.raw = element.data = ""; //This causes the current element to not be added to the element list
+							}
+						}
+					}
+				}
+				else if (this._tagStack[this._tagStack.length - 1] == ElementType.Style) { //We're currently in a style tag
+					if (elementName == "/style") //Actually, we're no longer in a style tag, so pop it off the stack
+						this._tagStack.pop();
+					else {
+						if (element.raw.indexOf("!--") != 0) { //Make sure we're not in a comment
+							//All data from here to style close is now a text element
+							element.type = ElementType.Text;
+							//If the previous element is text, append the current text to it
+							if (this._elements.length && this._elements[this._elements.length - 1].type == ElementType.Text) {
+								var prevElement = this._elements[this._elements.length - 1];
+								if (element.raw != "") {
+									prevElement.raw = prevElement.data = prevElement.raw + this._prevTagSep + element.raw;
+									element.raw = element.data = ""; //This causes the current element to not be added to the element list
+								} else { //Element is empty, so just append the last tag marker found
+									prevElement.raw = prevElement.data = prevElement.raw + this._prevTagSep;
+								}
+							} else { //The previous element was not text
+								if (element.raw != "") {
+									element.raw = element.data = element.raw;
+								}
+							}
+						}
+					}
+				}
+				else if (this._tagStack[this._tagStack.length - 1] == ElementType.Comment) { //We're currently in a comment tag
+					var rawLen = element.raw.length;
+					if (element.raw.charAt(rawLen - 2) == "-" && element.raw.charAt(rawLen - 1) == "-" && tagSep == ">") {
+						//Actually, we're no longer in a style tag, so pop it off the stack
+						this._tagStack.pop();
+						//If the previous element is a comment, append the current text to it
+						if (this._elements.length && this._elements[this._elements.length - 1].type == ElementType.Comment) {
+							var prevElement = this._elements[this._elements.length - 1];
+							prevElement.raw = prevElement.data = (prevElement.raw + element.raw).replace(Parser._reTrimComment, "");
+							element.raw = element.data = ""; //This causes the current element to not be added to the element list
+							element.type = ElementType.Text;
+						}
+						else //Previous element not a comment
+							element.type = ElementType.Comment; //Change the current element's type to a comment
+					}
+					else { //Still in a comment tag
+						element.type = ElementType.Comment;
+						//If the previous element is a comment, append the current text to it
+						if (this._elements.length && this._elements[this._elements.length - 1].type == ElementType.Comment) {
+							var prevElement = this._elements[this._elements.length - 1];
+							prevElement.raw = prevElement.data = prevElement.raw + element.raw + tagSep;
+							element.raw = element.data = ""; //This causes the current element to not be added to the element list
+							element.type = ElementType.Text;
+						}
+						else
+							element.raw = element.data = element.raw + tagSep;
+					}
+				}
+			}
+	
+			//Processing of non-special tags
+			if (element.type == ElementType.Tag) {
+				element.name = elementName;
+				
+				if (element.raw.indexOf("!--") == 0) { //This tag is really comment
+					element.type = ElementType.Comment;
+					delete element["name"];
+					var rawLen = element.raw.length;
+					//Check if the comment is terminated in the current element
+					if (element.raw.charAt(rawLen - 1) == "-" && element.raw.charAt(rawLen - 2) == "-" && tagSep == ">")
+						element.raw = element.data = element.raw.replace(Parser._reTrimComment, "");
+					else { //It's not so push the comment onto the tag stack
+						element.raw += tagSep;
+						this._tagStack.push(ElementType.Comment);
+					}
+				}
+				else if (element.raw.indexOf("!") == 0 || element.raw.indexOf("?") == 0) {
+					element.type = ElementType.Directive;
+					//TODO: what about CDATA?
+				}
+				else if (element.name == "script") {
+					element.type = ElementType.Script;
+					//Special tag, push onto the tag stack if not terminated
+					if (element.data.charAt(element.data.length - 1) != "/")
+						this._tagStack.push(ElementType.Script);
+				}
+				else if (element.name == "/script")
+					element.type = ElementType.Script;
+				else if (element.name == "style") {
+					element.type = ElementType.Style;
+					//Special tag, push onto the tag stack if not terminated
+					if (element.data.charAt(element.data.length - 1) != "/")
+						this._tagStack.push(ElementType.Style);
+				}
+				else if (element.name == "/style")
+					element.type = ElementType.Style;
+				if (element.name && element.name.charAt(0) == "/")
+					element.data = element.name;
+			}
+	
+			//Add all tags and non-empty text elements to the element list
+			if (element.raw != "" || element.type != ElementType.Text) {
+				if (this._options.includeLocation && !element.location) {
+					element.location = this.getLocation(element.type == ElementType.Tag);
+				}
+				this.parseAttribs(element);
+				this._elements.push(element);
+				//If tag self-terminates, add an explicit, separate closing tag
+				if (
+					element.type != ElementType.Text
+					&&
+					element.type != ElementType.Comment
+					&&
+					element.type != ElementType.Directive
+					&&
+					element.data.charAt(element.data.length - 1) == "/"
+					)
+					this._elements.push({
+						  raw: "/" + element.name
+						, data: "/" + element.name
+						, name: "/" + element.name
+						, type: element.type
+					});
+			}
+			this._parseState = (tagSep == "<") ? ElementType.Tag : ElementType.Text;
+			this._current = this._next + 1;
+			this._prevTagSep = tagSep;
+		}
+
+		if (this._options.includeLocation) {
+			this.getLocation();
+			this._location.row += this._location.inBuffer;
+			this._location.inBuffer = 0;
+			this._location.charOffset = 0;
+		}
+		this._buffer = (this._current <= bufferEnd) ? this._buffer.substring(this._current) : "";
+		this._current = 0;
+	
+		this.writeHandler();
+	}
+
+	Parser.prototype.getLocation = function Parser$getLocation (startTag) {
+		var c,
+			l = this._location,
+			end = this._current - (startTag ? 1 : 0),
+			chunk = startTag && l.charOffset == 0 && this._current == 0;
+		
+		for (; l.charOffset < end; l.charOffset++) {
+			c = this._buffer.charAt(l.charOffset);
+			if (c == '\n') {
+				l.inBuffer++;
+				l.col = 0;
+			} else if (c != '\r') {
+				l.col++;
+			}
+		}
+		return {
+			  line: l.row + l.inBuffer + 1
+			, col: l.col + (chunk ? 0: 1)
+		};
+	}
+
+	//Checks the handler to make it is an object with the right "interface"
+	Parser.prototype.validateHandler = function Parser$validateHandler (handler) {
+		if ((typeof handler) != "object")
+			throw new Error("Handler is not an object");
+		if ((typeof handler.reset) != "function")
+			throw new Error("Handler method 'reset' is invalid");
+		if ((typeof handler.done) != "function")
+			throw new Error("Handler method 'done' is invalid");
+		if ((typeof handler.writeTag) != "function")
+			throw new Error("Handler method 'writeTag' is invalid");
+		if ((typeof handler.writeText) != "function")
+			throw new Error("Handler method 'writeText' is invalid");
+		if ((typeof handler.writeComment) != "function")
+			throw new Error("Handler method 'writeComment' is invalid");
+		if ((typeof handler.writeDirective) != "function")
+			throw new Error("Handler method 'writeDirective' is invalid");
+	}
+
+	//Writes parsed elements out to the handler
+	Parser.prototype.writeHandler = function Parser$writeHandler (forceFlush) {
+		forceFlush = !!forceFlush;
+		if (this._tagStack.length && !forceFlush)
+			return;
+		while (this._elements.length) {
+			var element = this._elements.shift();
+			switch (element.type) {
+				case ElementType.Comment:
+					this._handler.writeComment(element);
+					break;
+				case ElementType.Directive:
+					this._handler.writeDirective(element);
+					break;
+				case ElementType.Text:
+					this._handler.writeText(element);
+					break;
+				default:
+					this._handler.writeTag(element);
+					break;
+			}
+		}
+	}
+
+	Parser.prototype.handleError = function Parser$handleError (error) {
+		if ((typeof this._handler.error) == "function")
+			this._handler.error(error);
+		else
+			throw error;
+	}
+
+
+///////////////////////////////////////////////////
+
+
+
+
+	
+
+	function inherits (ctor, superCtor) {
+		var tempCtor = function(){};
+		tempCtor.prototype = superCtor.prototype;
+		ctor.super_ = superCtor;
+		ctor.prototype = new tempCtor();
+		ctor.prototype.constructor = ctor;
+	}
+
+exports.Parser = Parser;
+
+
 })();
