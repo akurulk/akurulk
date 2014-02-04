@@ -19,7 +19,7 @@ uglifyjs lib/vendors/htmlparser.js >> dist/akuru.min.js
 uglifyjs lib/akuru.js >> dist/akuru.min.js
 uglifyjs lib/loader.js >> dist/akuru.min.js
 
-echo "Conpying additional files to dist"
+echo "Copying additional files to dist"
 
 cp lib/fonts dist -r
 cp lib/vendors dist -r
